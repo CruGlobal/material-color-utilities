@@ -1,0 +1,46 @@
+name: Publish Fork
+
+on:
+  push:
+    branches: ['build/*']
+  pull_request:
+    branches: ['build/*']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static_checks:
+    name: Static Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run Static Checks
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: check --parallel
+
+  deploy:
+    name: Publish Fork
+    runs-on: macos-latest
+    if: github.event_name == 'push'
+    needs: [ static_checks ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Java JDK
+        uses: actions/setup-java@v3.0.0
+        with:
+          distribution: 'adopt'
+          java-version: '11'
+      - name: Publish library
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: publish --parallel
+        env:
+          ORG_GRADLE_PROJECT_cruGlobalMavenRepositoryUsername: ${{ secrets.JFROG_USERNAME }}
+          ORG_GRADLE_PROJECT_cruGlobalMavenRepositoryPassword: ${{ secrets.JFROG_PASSWORD }}
